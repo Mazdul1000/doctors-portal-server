@@ -115,6 +115,12 @@ async function run() {
 
         // Doctor colleciton
 
+
+        app.get('/doctors',verifyToken,verifyAdmin, async(req, res) => {
+            const doctors = await doctorCollection.find().toArray();
+            res.send(doctors)  
+        })
+
         app.post('/doctor', verifyToken,verifyAdmin, async(req, res) => {
             const doctor = req.body;
             const result = await doctorCollection.insertOne(doctor);
