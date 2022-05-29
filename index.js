@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const nodemailer = require("nodemailer");
+const sgTransport = require('nodemailer-sendgrid-transport');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 require('dotenv').config();
 
@@ -32,6 +34,44 @@ async function verifyToken(req, res, next) {
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.nte3h.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+const emailSenderOptions = {
+    auth: {
+      api_key: process.env.EMAIL_SENDER_KEY
+    }
+  }
+
+  const emailClient = nodemailer.createTransport(sgTransport(emailSenderOptions));
+
+function sendAppointmentEmail(booking){
+      const {patient, patientName, treatment, slot, date} = booking;
+
+      var email = {
+        from: process.env.EMAIL_SENDER,
+        to: patient,
+        subject: `Your Appointment for ${treatment} on ${date} at ${slot} is Confirmed`,
+        text: `Hello ${patientName}, Your Appointment for ${treatment} on ${date} at ${slot} is Confirmed `,
+        html: `
+        <div>
+           <h3> Hello ${patientName}</h3>
+           <h1>Your appointment for ${treatment} is confirmed</h1>
+           <p>Looking forward to see you on ${date} at ${slot}</p>
+           <h3>Our Address </h3>
+           <p>Andor Killa , Bandorban</p>
+           <p>Bangladesh</p>
+           <a href="https://mazdul1000.com/">unsubscribe</a>
+        </div>`
+      };
+      
+      emailClient.sendMail(email, function(err, info){
+        if (err ){
+          console.log(err);
+        }
+        else {
+          console.log('Message sent: ', info);
+        }
+    });
+}
 
 async function run() {
 
@@ -127,6 +167,13 @@ async function run() {
             res.send(result);
         })
 
+        app.delete('/doctor/:email', verifyToken, verifyAdmin, async(req, res) => {
+            const email = req.params.email;
+            const filter = {email:email};
+            const result = await doctorCollection.deleteOne(filter);
+            res.send(result);
+        })
+
 
         // ***************************************
 
@@ -190,7 +237,10 @@ async function run() {
             if (exists) {
                 return res.send({ success: false, booking: exists })
             }
+
             const result = await bookingCollection.insertOne(booking);
+            console.log('sendnig Email')
+            sendAppointmentEmail(booking);
             return res.send({ success: true, result });
         })
 
